@@ -23,6 +23,7 @@ add_executable(edinz
     src/main.cpp
     src/terminal.cpp
     src/app.cpp
+    src/window.cpp
 )
 
 add_dependencies(edinz generate_version)

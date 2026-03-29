@@ -8,9 +8,9 @@ namespace edinz {
 
 App::App() {
     m_menu = {
-        {"Open file",  'o', [this] { setStatus("Open file selected"); }},
+        {"Open file",  'o', [this] { openFileWindow(); }},
         {"Save file",  's', [this] { setStatus("Save file selected"); }},
-        {"Settings",   'e', [this] { setStatus("Settings selected"); }},
+        {"Settings",   'e', [this] { openSettingsWindow(); }},
         {"Quit",       'q', [this] { m_running = false; }},
     };
 }
@@ -36,21 +36,20 @@ void App::run() {
 
 void App::render() {
     auto [rows, cols] = m_term.size();
+    ScreenBuffer buf(rows, cols);
 
-    m_term.hideCursor();
-    m_term.moveTo(1, 1);
-
-    // Title bar
+    // === Title bar (row 0) ===
     std::string title = std::format(" edinz v{} ", edinz::version_full());
     std::string bar(static_cast<std::size_t>(cols), '=');
     auto pad = (cols - static_cast<int>(title.size())) / 2;
     if (pad > 0) {
         bar.replace(static_cast<std::size_t>(pad), title.size(), title);
     }
-    m_term.write(bar);
-    m_term.write("\r\n\r\n");
+    buf.writeText(0, 0, bar);
 
-    // Menu items
+    // === Menu items (starting at row 2) ===
+    bool menuActive = !m_wm.hasFocus();
+
     for (int i = 0; i < static_cast<int>(m_menu.size()); ++i) {
         const auto& item = m_menu[static_cast<std::size_t>(i)];
 
@@ -59,46 +58,67 @@ void App::render() {
             shortcut_hint = std::format("Ctrl+{}", static_cast<char>(item.shortcut - 32));
         }
 
-        if (i == m_selected) {
-            m_term.write(std::format("  \x1b[7m > {} \x1b[0m", item.label));
+        bool selected = (i == m_selected);
+        if (selected && menuActive) {
+            buf.writeText(2 + i, 2, std::format(" > {} ", item.label), Cell::Reverse);
+        } else if (selected) {
+            buf.writeText(2 + i, 2, std::format(" > {} ", item.label), Cell::Dim);
         } else {
-            m_term.write(std::format("    {}",  item.label));
+            buf.writeText(2 + i, 4, item.label);
         }
 
         if (!shortcut_hint.empty()) {
-            // Right-align the shortcut hint
-            auto label_len = item.label.size() + 6; // account for prefix
-            auto gap = cols - static_cast<int>(label_len) - static_cast<int>(shortcut_hint.size()) - 2;
-            if (gap > 0) {
-                m_term.write(std::string(static_cast<std::size_t>(gap), ' '));
+            int hintCol = cols - static_cast<int>(shortcut_hint.size()) - 2;
+            if (hintCol > 0) {
+                buf.writeText(2 + i, hintCol, shortcut_hint, Cell::Dim);
             }
-            m_term.write(std::format("\x1b[2m{}\x1b[0m", shortcut_hint));
         }
-
-        m_term.write("\x1b[K\r\n");
     }
 
-    // Status line
-    m_term.moveTo(rows - 1, 1);
-    m_term.write(std::string(static_cast<std::size_t>(cols), ' ')); // clear line
-    m_term.moveTo(rows - 1, 1);
-
+    // === Status line ===
     if (!m_status.empty()) {
-        m_term.write(std::format("\x1b[33m{}\x1b[0m", m_status));
+        buf.writeText(rows - 2, 1, m_status);
     }
 
-    // Bottom bar with shortcut reminder
-    m_term.moveTo(rows, 1);
+    // === Bottom bar ===
+    std::string hint =
+        " Up/Down: navigate | Enter: select | Tab: cycle windows "
+        "| Ctrl+W: close | Ctrl+Q: quit ";
     std::string bottom(static_cast<std::size_t>(cols), ' ');
-    std::string hint = " Up/Down: navigate | Enter: select | Ctrl+Q: quit ";
     if (static_cast<int>(hint.size()) <= cols) {
         bottom.replace(0, hint.size(), hint);
     }
-    m_term.write(std::format("\x1b[7m{}\x1b[0m", bottom));
+    buf.writeText(rows - 1, 0, bottom, Cell::Reverse);
+
+    // === Overlay windows ===
+    m_wm.renderTo(buf);
+
+    // === Flush ===
+    m_term.hideCursor();
+    buf.renderTo(m_term);
 }
 
 void App::handleKey(const KeyEvent& event) {
     if (auto* key = std::get_if<Key>(&event)) {
+        if (m_wm.hasFocus()) {
+            switch (*key) {
+                case Key::Up:
+                    if (auto w = m_wm.focusedWindow()) w->scrollUp();
+                    return;
+                case Key::Down:
+                    if (auto w = m_wm.focusedWindow()) w->scrollDown();
+                    return;
+                case Key::Escape:
+                    m_status.clear();
+                    return;
+                case Key::Tab:
+                    m_wm.focusNext();
+                    return;
+                default:
+                    return;
+            }
+        }
+
         switch (*key) {
             case Key::Up:    moveUp(); break;
             case Key::Down:  moveDown(); break;
@@ -106,9 +126,16 @@ void App::handleKey(const KeyEvent& event) {
             case Key::Escape:
                 m_status.clear();
                 break;
+            case Key::Tab:
+                if (!m_wm.empty()) m_wm.focusNext();
+                break;
             default: break;
         }
     } else if (auto* ctrl = std::get_if<Ctrl>(&event)) {
+        if (ctrl->ch == 'w') {
+            m_wm.closeFocused();
+            return;
+        }
         // Match against menu shortcuts
         for (const auto& item : m_menu) {
             if (item.shortcut == ctrl->ch) {
@@ -136,6 +163,43 @@ void App::selectCurrent() {
     if (idx < m_menu.size() && m_menu[idx].action) {
         m_menu[idx].action();
     }
+}
+
+void App::openFileWindow() {
+    int offset = (m_windowCount % 5) * 2;
+    ++m_windowCount;
+    auto win = m_wm.createWindow(3 + offset, 5 + offset, 14, 40, "Open File");
+    win->setContent({
+        "Files:",
+        "",
+        "  CMakeLists.txt",
+        "  flake.nix",
+        "  src/",
+        "    main.cpp",
+        "    app.cpp",
+        "    app.hpp",
+        "    terminal.cpp",
+        "    terminal.hpp",
+        "    window.cpp",
+        "    window.hpp",
+    });
+    setStatus("Opened file browser window");
+}
+
+void App::openSettingsWindow() {
+    int offset = (m_windowCount % 5) * 2;
+    ++m_windowCount;
+    auto win = m_wm.createWindow(4 + offset, 20 + offset, 10, 35, "Settings");
+    win->setContent({
+        "Configuration:",
+        "",
+        "  Theme:        Dark",
+        "  Font size:    14",
+        "  Tab size:     4",
+        "  Line numbers: On",
+        "  Word wrap:    Off",
+    });
+    setStatus("Opened settings window");
 }
 
 } // namespace edinz

@@ -27,12 +27,14 @@
 
         devShells.default = pkgs.mkShell {
           packages = with pkgs; [
-            cmake
-            ninja
             clang-tools
+            cmake
             gdb
+            gh
             git
+            github-copilot-cli
             lldb
+            ninja
           ];
 
           # Use clang with C++23 support

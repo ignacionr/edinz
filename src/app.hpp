@@ -1,6 +1,7 @@
 #pragma once
 
 #include "terminal.hpp"
+#include "window.hpp"
 
 #include <functional>
 #include <string>
@@ -28,15 +29,20 @@ private:
     void moveDown();
     void selectCurrent();
 
+    void openFileWindow();
+    void openSettingsWindow();
+
     void setStatus(const std::string& status) {
         m_status = status;
     }
 
     Terminal m_term;
+    WindowManager m_wm;
     std::vector<MenuItem> m_menu;
     int m_selected{0};
     bool m_running{true};
     std::string m_status;
+    int m_windowCount{0};
 };
 
 } // namespace edinz
