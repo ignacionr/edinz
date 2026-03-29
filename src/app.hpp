@@ -28,6 +28,10 @@ private:
     void moveDown();
     void selectCurrent();
 
+    void setStatus(const std::string& status) {
+        m_status = status;
+    }
+
     Terminal m_term;
     std::vector<MenuItem> m_menu;
     int m_selected{0};

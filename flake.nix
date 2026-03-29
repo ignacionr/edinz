@@ -32,6 +32,7 @@
             clang-tools
             gdb
             git
+            lldb
           ];
 
           # Use clang with C++23 support

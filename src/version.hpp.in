@@ -1,0 +1,23 @@
+#pragma once
+
+#define EDINZ_VERSION_MAJOR @PROJECT_VERSION_MAJOR@
+#define EDINZ_VERSION_MINOR @PROJECT_VERSION_MINOR@
+#define EDINZ_VERSION_PATCH @PROJECT_VERSION_PATCH@
+#define EDINZ_VERSION "@PROJECT_VERSION@"
+#define EDINZ_GIT_HASH "@EDINZ_GIT_HASH@"
+#define EDINZ_GIT_DIRTY @EDINZ_GIT_DIRTY@
+
+namespace edinz {
+
+constexpr const char* version = EDINZ_VERSION;
+constexpr const char* git_hash = EDINZ_GIT_HASH;
+constexpr bool git_dirty = EDINZ_GIT_DIRTY;
+
+constexpr const char* version_full() {
+    if constexpr (EDINZ_GIT_DIRTY)
+        return EDINZ_VERSION "-" EDINZ_GIT_HASH "-dirty";
+    else
+        return EDINZ_VERSION "-" EDINZ_GIT_HASH;
+}
+
+} // namespace edinz

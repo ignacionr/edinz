@@ -1,4 +1,5 @@
 #include "app.hpp"
+#include "version.hpp"
 
 #include <format>
 #include <string>
@@ -7,10 +8,9 @@ namespace edinz {
 
 App::App() {
     m_menu = {
-        {"Open file",  'o', [this] { m_status = "Open file selected"; }},
-        {"Save file",  's', [this] { m_status = "Save file selected"; }},
-        {"Settings",   'e', [this] { m_status = "Settings selected"; }},
-        {"Help",       'h', [this] { m_status = "Help selected"; }},
+        {"Open file",  'o', [this] { setStatus("Open file selected"); }},
+        {"Save file",  's', [this] { setStatus("Save file selected"); }},
+        {"Settings",   'e', [this] { setStatus("Settings selected"); }},
         {"Quit",       'q', [this] { m_running = false; }},
     };
 }
@@ -41,7 +41,7 @@ void App::render() {
     m_term.moveTo(1, 1);
 
     // Title bar
-    std::string title = " edinz v0.1.0 ";
+    std::string title = std::format(" edinz v{} ", edinz::version_full());
     std::string bar(static_cast<std::size_t>(cols), '=');
     auto pad = (cols - static_cast<int>(title.size())) / 2;
     if (pad > 0) {
