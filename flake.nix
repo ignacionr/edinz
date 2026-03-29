@@ -39,6 +39,7 @@
             github-copilot-cli
             lldb
             ninja
+            tmux
           ];
 
           # Use clang with C++23 support
