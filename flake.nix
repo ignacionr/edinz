@@ -9,7 +9,11 @@
   outputs = { self, nixpkgs, flake-utils }:
     flake-utils.lib.eachDefaultSystem (system:
       let
-        pkgs = nixpkgs.legacyPackages.${system};
+        # Override the default pkgs to allow unfree software
+        pkgs = import nixpkgs {
+          inherit system;
+          config.allowUnfree = true;
+        };
       in
       {
         packages.default = pkgs.stdenv.mkDerivation {
@@ -43,3 +47,4 @@
       }
     );
 }
+
